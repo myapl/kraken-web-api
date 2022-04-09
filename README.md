@@ -1,5 +1,5 @@
 # Minimal Python layout
-A minimal python project layout (template for future use)
+A minimal python project layout (template for future use). It includes setup files, testing (in separate folder), some github actions and tox configuration.
 
 The original author of this code is James Murphy:
 [SlapThatLikeButton-TestingStarterProject](https://github.com/mCodingLLC/SlapThatLikeButton-TestingStarterProject)
