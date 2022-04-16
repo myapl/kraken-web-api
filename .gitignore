@@ -4,3 +4,4 @@ env/
 *.egg-info/
 __pycache__/
 .tox/
+build/

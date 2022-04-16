@@ -1,5 +1,5 @@
 import logging
-from project.app import log_message
+from kraken_web_api.app import log_message
 
 
 LOGGER = logging.getLogger(__name__)
