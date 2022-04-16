@@ -3,7 +3,6 @@ from decimal import Decimal
 from unittest.mock import patch
 import pytest
 
-import pytest
 from kraken_web_api.exceptions import InvalidJsonException
 from kraken_web_api.handlers import Handler
 from kraken_web_api.model.order_book import OrderBook
