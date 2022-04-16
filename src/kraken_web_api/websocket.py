@@ -2,7 +2,7 @@
 import asyncio
 import json
 import logging
-from typing import Callable, Set, Optional
+from typing import Callable, Set, Optional, Union
 from websockets import client
 
 from kraken_web_api.constants import SOCKET_PUBLIC
@@ -70,12 +70,7 @@ class WebSocket:
         if len(websocket.messages) == 0:
             raise SocketConnectionError("Could not connect to kraken websocket: %s", socket)
         message = websocket.messages.pop()
-        if isinstance(message, bytes):
-            message = message.decode()
-        connection = Handler.handle_message(message)
-        if not isinstance(connection, SocketConnection):
-            raise SocketConnectionError("Unable to handle recieved connection message: %s", socket)
-        connection.websocket = websocket
+        connection = self._handle_connection_message(message, websocket)
         self.connections.add(connection)
         asyncio.create_task(self._recieve(connection.websocket))
         self.logger.debug("Websocket connection has been created: %s", socket)
@@ -93,6 +88,18 @@ class WebSocket:
         connection = self._get_public_connection()
         if connection is not None:
             await connection.websocket.send(message)
+
+    def _handle_connection_message(self, message: Union[str, bytes],
+                                   websocket: client.WebSocketClientProtocol
+    ) -> SocketConnection:
+        """ Handle recieved connection message """
+        if isinstance(message, bytes):
+            message = message.decode()
+        connection = Handler.handle_message(message)
+        if not isinstance(connection, SocketConnection):
+            raise SocketConnectionError("Unable to handle recieved connection message: %s", message)
+        connection.websocket = websocket
+        return connection
 
     def _handle_object(self, obj: object):
         if isinstance(obj, Channel):
