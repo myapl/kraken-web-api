@@ -5,9 +5,10 @@ from typing import Dict, List
 from kraken_web_api.enums import DictResponse
 
 from kraken_web_api.exceptions import BookDataHandlingException, InvalidJsonException
+from kraken_web_api.model.channel import Channel
 from kraken_web_api.model.order_book import OrderBook
 from kraken_web_api.model.price import Price
-from kraken_web_api.model.socket_connection import SocketConnection
+from kraken_web_api.model.connection import SocketConnection
 
 
 class Handler:
@@ -19,9 +20,9 @@ class Handler:
         try:
             obj = json.loads(message)
             if isinstance(obj, List):
-                return Handler._handle_list_object(data_list=obj)
+                return Handler._handle_list_object(obj)
             if isinstance(obj, Dict):
-                return Handler._handle_dict_object(data_dict=obj)
+                return Handler._handle_dict_object(obj)
         except Exception as e:
             raise InvalidJsonException("Incorrect JSON data from Kraken: %s", e)
         return None
@@ -31,10 +32,13 @@ class Handler:
         """ Handle respons in Dict format """
         if DictResponse.connectionID.name in data_dict:
             return SocketConnection.from_dict(data_dict)
+        if DictResponse.channelID.name in data_dict:
+            return Channel.from_dict(data_dict)
         return None
 
     @staticmethod
     def _handle_list_object(data_list: List) -> object:
+        # subscription_id = data_list[0]
         book = OrderBook()
         return Handler.handle_book_data(data_list, book)
 
