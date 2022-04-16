@@ -9,7 +9,9 @@ from kraken_web_api.constants import SOCKET_PUBLIC
 from kraken_web_api.enums import ConnectionStatus
 from kraken_web_api.exceptions import SocketConnectionError
 from kraken_web_api.handlers import Handler
-from kraken_web_api.model.socket_connection import SocketConnection
+from kraken_web_api.model.channel import Channel
+from kraken_web_api.model.connection import SocketConnection
+from kraken_web_api.model.subscription import Subscription
 
 
 class WebSocket:
@@ -22,6 +24,7 @@ class WebSocket:
         """
         self._configure_loggers(name, socket_log_level)
         self.connections: Set[SocketConnection] = set()
+        self.channels: Set[Channel] = set()
         self.disconnecting = False
         self.logger.debug("Kraken client has been instantiated")
 
@@ -51,7 +54,12 @@ class WebSocket:
             },
             "pair": ["NANO/ETH"]
         }
-        return await self._send_public(json.dumps(subscription_obj))
+        await self._send_public(json.dumps(subscription_obj))
+        return True
+
+    async def unsubscribe_all(self):
+        """ Unsubscribe all channels """
+        pass
 
     async def _connect_socket(self, socket: str) -> None:
         """ Create new websocket connection
@@ -78,12 +86,19 @@ class WebSocket:
         await asyncio.sleep(0)
         async for message in websocket:
             self.logger.debug("Message recieved: %s", message)
+            object = Handler.handle_message(message)
+            self._handle_object(object)
 
     async def _send_public(self, message):
         """ Send a message to websocket """
         connection = self._get_public_connection()
         if connection is not None:
             await connection.websocket.send(message)
+
+    def _handle_object(self, obj: object):
+        if isinstance(obj, Channel):
+            self.channels.add(obj)
+            self.logger.debug("New channel subscribed: %s", obj)
 
     async def _disconnect_all(self) -> None:
         """ Disconnect all active websocket connections """
