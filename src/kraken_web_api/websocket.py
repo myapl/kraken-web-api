@@ -90,7 +90,7 @@ class WebSocket:
 
     def _handle_connection_message(self, message: Union[str, bytes],
                                    websocket: client.WebSocketClientProtocol
-    ) -> SocketConnection:
+                                   ) -> SocketConnection:
         """ Handle recieved connection message """
         if isinstance(message, bytes):
             message = message.decode()
@@ -101,6 +101,7 @@ class WebSocket:
         return connection
 
     def _handle_object(self, obj: object):
+        """ Handle object depending of it's type """
         if isinstance(obj, Channel):
             self.channels.add(obj)
             self.logger.debug("New channel subscribed: %s", obj)
