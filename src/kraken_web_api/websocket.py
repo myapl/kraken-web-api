@@ -11,7 +11,6 @@ from kraken_web_api.exceptions import SocketConnectionError
 from kraken_web_api.handlers import Handler
 from kraken_web_api.model.channel import Channel
 from kraken_web_api.model.connection import SocketConnection
-from kraken_web_api.model.subscription import Subscription
 
 
 class WebSocket:
