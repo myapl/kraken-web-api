@@ -1,10 +1,36 @@
+import asyncio
 import logging
 
+from kraken_web_api.websocket import WebSocket
 
-def log_message(message: str):
-    logging.debug(message)
+
+def on_update():
+    pass
+
+
+class Runner:
+    async def start(self):
+        async with WebSocket(socket_log_level=logging.INFO) as self.client:
+            task_connect_public = asyncio.create_task(self.client.subscribe_orders_book(on_update))
+            await task_connect_public
+            await asyncio.sleep(3)
+        # self.client = WebSocket(socket_log_level=logging.INFO)
+        # task_connect_public = asyncio.create_task(self.client.subscribe_orders_book(on_update))
+        # await task_connect_public
+        await asyncio.sleep(10)
+
+    async def stop(self):
+        await self.client._disconnect_all()
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-    log_message("this is a debug message")
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s  %(name)s  %(levelname)s: %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+    runner = Runner()
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(runner.start())
+    except KeyboardInterrupt:
+        print("keyb interrupt")
+        loop.run_until_complete(runner.stop())
