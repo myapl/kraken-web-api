@@ -11,9 +11,9 @@ def on_update():
 class Runner:
     async def start(self):
         async with WebSocket(socket_log_level=logging.INFO) as self.client:
-            task_connect_public = asyncio.create_task(self.client.subscribe_orders_book("ETH/BTC", 10, on_update))
-            await task_connect_public
-            # await asyncio.sleep(30)
+            task_subscribe = asyncio.create_task(self.client.subscribe_orders_book("ETH/BTC", 10, on_update))
+            await task_subscribe
+            # await asyncio.sleep(3)
             while True:
                 await asyncio.sleep(0)
         # self.client = WebSocket(socket_log_level=logging.INFO)
@@ -22,6 +22,7 @@ class Runner:
         # await asyncio.sleep(10)
 
     async def stop(self):
+        await self.client.unsubscribe_all()
         await self.client._disconnect_all()
 
 
