@@ -71,19 +71,22 @@ class Handler:
             order_book.asks = Handler._update_order_book_price(data[1]["a"], order_book.asks)
         if "b" in data[1]:
             order_book.bids = Handler._update_order_book_price(data[1]["b"], order_book.bids)
+        order_book.symbol = data[-1]
+        order_book.count = data[-2]
         return order_book
 
     @staticmethod
     def _update_order_book_price(data: List, prices: List[Price]):
         for record in data:
             price_object = Price(Decimal(record[0]), Decimal(record[1]), Decimal(record[2]))
-            price = [p for p in prices if p.price == price_object.price]
-            if len(price) == 0:
-                prices.append(price_object)
-                continue
-            if price_object.volume == 0.0:
-                prices.remove(price[0])
-                continue
-            price[0].volume = price_object.volume
-            price[0].timestamp = price_object.timestamp
+            # price = [p for p in prices if p.price == price_object.price]
+            # if len(price) == 0:
+            #     prices.append(price_object)
+            #     continue
+            # if price_object.volume == 0.0:
+            #     prices.remove(price[0])
+            #     continue
+            # price[0].volume = price_object.volume
+            # price[0].timestamp = price_object.timestamp
+            prices.append(price_object)
         return prices
