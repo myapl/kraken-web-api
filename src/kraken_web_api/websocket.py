@@ -11,6 +11,7 @@ from kraken_web_api.exceptions import SocketConnectionError
 from kraken_web_api.handlers import Handler
 from kraken_web_api.model.channel import Channel
 from kraken_web_api.model.connection import SocketConnection
+from kraken_web_api.model.order_book import OrderBook
 
 
 class WebSocket:
@@ -24,6 +25,8 @@ class WebSocket:
         self._configure_loggers(name, socket_log_level)
         self.connections: Set[SocketConnection] = set()
         self.channels: Set[Channel] = set()
+        self.order_book : OrderBook = None
+        self._on_book_changed: Callable = None
         self.disconnecting = False
         self.logger.debug("Kraken client has been instantiated")
 
@@ -34,14 +37,12 @@ class WebSocket:
     async def __aexit__(self, exc_t, exc_v, exc_tb):
         await self._disconnect_all()
 
-    async def subscribe_orders_book(self, on_update: Callable = None) -> bool:
+    async def subscribe_orders_book(self, on_update: Callable = None) -> None:
         """ Subscribe to orders book
         Parameters:
             pair (str) : Trading pair ("NANO/ETH", etc.)
             depth (int) : Book depth (10, 100, 500, etc.)
             on_update (function) : Function to invoke on book updates
-        Return:
-            result (bool) : Success
         """
         if self._get_public_connection() is None:
             await self._connect_socket(SOCKET_PUBLIC)
@@ -54,7 +55,7 @@ class WebSocket:
             "pair": ["NANO/ETH"]
         }
         await self._send_public(json.dumps(subscription_obj))
-        return True
+        self._on_book_changed = on_update
 
     async def unsubscribe_all(self):
         """ Unsubscribe all channels """
@@ -105,6 +106,11 @@ class WebSocket:
         if isinstance(obj, Channel):
             self.channels.add(obj)
             self.logger.debug("New channel subscribed: %s", obj)
+        if isinstance(obj, OrderBook):
+            self.order_book = obj
+            if self._on_book_changed is not None:
+                self._on_book_changed()
+            self.logger.debug("Order book has been updated: %s", obj)
 
     async def _disconnect_all(self) -> None:
         """ Disconnect all active websocket connections """
