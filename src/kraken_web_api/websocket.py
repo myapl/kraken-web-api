@@ -25,7 +25,7 @@ class WebSocket:
         self._configure_loggers(name, socket_log_level)
         self.connections: Set[SocketConnection] = set()
         self.channels: Set[Channel] = set()
-        self.order_book : OrderBook = None
+        self.order_book: OrderBook = None
         self._on_book_changed: Callable = None
         self.disconnecting = False
         self.logger.debug("Kraken client has been instantiated")
