@@ -37,10 +37,10 @@ class WebSocket:
     async def __aexit__(self, exc_t, exc_v, exc_tb):
         await self._disconnect_all()
 
-    async def subscribe_orders_book(self, on_update: Callable = None) -> None:
+    async def subscribe_orders_book(self, pair: str, depth: int, on_update: Callable = None) -> None:
         """ Subscribe to orders book
         Parameters:
-            pair (str) : Trading pair ("NANO/ETH", etc.)
+            pair (str) : Trading pair ("ETH/BTC", etc.)
             depth (int) : Book depth (10, 100, 500, etc.)
             on_update (function) : Function to invoke on book updates
         """
@@ -49,10 +49,10 @@ class WebSocket:
         subscription_obj = {
             "event": "subscribe",
             "subscription": {
-                "depth": 10,
+                "depth": depth,
                 "name": "book"
             },
-            "pair": ["NANO/ETH"]
+            "pair": [pair]
         }
         await self._send_public(json.dumps(subscription_obj))
         self._on_book_changed = on_update
@@ -83,7 +83,7 @@ class WebSocket:
             object = Handler.handle_message(message)
             self._handle_object(object)
 
-    async def _send_public(self, message):
+    async def _send_public(self, message) -> None:
         """ Send a message to websocket """
         connection = self._get_public_connection()
         if connection is not None:

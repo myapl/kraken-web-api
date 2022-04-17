@@ -11,7 +11,7 @@ def on_update():
 class Runner:
     async def start(self):
         async with WebSocket(socket_log_level=logging.INFO) as self.client:
-            task_connect_public = asyncio.create_task(self.client.subscribe_orders_book(on_update))
+            task_connect_public = asyncio.create_task(self.client.subscribe_orders_book("ETH/BTC", 10, on_update))
             await task_connect_public
             await asyncio.sleep(3)
         # self.client = WebSocket(socket_log_level=logging.INFO)
