@@ -36,6 +36,7 @@ DATA_DICT_MESSAGE = '{"channelID":2128,"channelName":"book-10","event":"subscrip
                     "subscription":{"depth":10,"name":"book"}}'
 
 EXPECTED_ORDER_BOOK = OrderBook(
+                                    2128,
                                     "book-10",
                                     "NANO/ETH",
                                     [

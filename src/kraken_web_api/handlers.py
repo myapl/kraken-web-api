@@ -54,7 +54,7 @@ class Handler:
 
     @staticmethod
     def _init_new_book(data: List) -> OrderBook:
-        book = OrderBook(data[-2], data[-1], [], [])
+        book = OrderBook(data[0], data[-2], data[-1], [], [])
         asks = data[1]["as"]
         for ask in asks:
             price = Price(Decimal(ask[0]), Decimal(ask[1]), Decimal(ask[2]))
