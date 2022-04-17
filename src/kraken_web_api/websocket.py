@@ -2,7 +2,7 @@
 import asyncio
 import json
 import logging
-from typing import Callable, Set, Optional, Union
+from typing import Callable, Dict, Set, Optional, Union
 from websockets import client
 
 from kraken_web_api.constants import SOCKET_PUBLIC
@@ -60,11 +60,27 @@ class WebSocket:
         await self._send_public(json.dumps(subscription_dict))
         self._on_book_changed = on_update
 
-    async def unsubscribe_all(self):
+    async def unsubscribe_all(self) -> None:
         """ Unsubscribe all channels """
         for channel in self.channels:
             if channel.status == ChannelStatus.subscribed:
-                pass
+                await self._unsubscribe_public(channel)
+
+    async def _unsubscribe_public(self, channel: Channel) -> None:
+        """ Unsubscribe channel using public connection """
+        connection = self._get_public_connection()
+        if connection is not None:
+            if channel.subscription.name == SubscriptionType.book.name:
+                request = self._unsubscribe_book_request(channel)
+                await connection.websocket.send(json.dumps(request))
+
+    def _unsubscribe_book_request(self, channel: Channel) -> Dict:
+        unsubscribe_obj = SubscriptionRequest(
+                event="unsubscribe",
+                subscription=channel.subscription,
+                pair=["ETH/BTC"]
+            )
+        return from_dataclass_to_dict(unsubscribe_obj)
 
     async def _connect_socket(self, socket: str) -> None:
         """ Create new websocket connection
@@ -80,7 +96,7 @@ class WebSocket:
         asyncio.create_task(self._recieve(connection.websocket))
         self.logger.debug("Websocket connection has been created: %s", socket)
 
-    async def _recieve(self, websocket):
+    async def _recieve(self, websocket) -> None:
         """ Recieve message """
         await asyncio.sleep(0)
         async for message in websocket:
@@ -106,16 +122,26 @@ class WebSocket:
         connection.websocket = websocket
         return connection
 
-    def _handle_object(self, obj: object):
+    def _handle_object(self, obj: object) -> None:
         """ Handle object depending of it's type """
         if isinstance(obj, Channel):
-            self.channels.add(obj)
-            self.logger.debug("New channel subscribed: %s", obj)
+            self._handle_channel(obj)
         if isinstance(obj, OrderBook):
             self.order_book = obj
             if self._on_book_changed is not None:
                 self._on_book_changed()
             self.logger.debug("Order book has been updated: %s", obj)
+
+    def _handle_channel(self, channel: Channel) -> None:
+        """ Handle channel object recieved """
+        if channel.status == ChannelStatus.subscribed:
+            self.channels.add(channel)
+            self.logger.debug("New channel subscribed: %s", channel)
+        else:
+            channels = [c for c in self.channels if c.channelID == channel.channelID]
+            if len(channels) > 0:
+                self.channels.remove(channels[0])
+                self.logger.debug("Channel has been unsubscribed: %s", channel)
 
     async def _disconnect_all(self) -> None:
         """ Disconnect all active websocket connections """
