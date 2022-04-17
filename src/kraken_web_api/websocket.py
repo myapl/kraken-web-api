@@ -2,7 +2,7 @@
 import asyncio
 import json
 import logging
-from typing import Callable, Dict, Set, Optional, Union
+from typing import Callable, Dict, List, Set, Optional, Union
 from websockets import client
 
 from kraken_web_api.constants import SOCKET_PUBLIC
@@ -13,6 +13,7 @@ from kraken_web_api.helpers.helpers import from_dataclass_to_dict
 from kraken_web_api.model.channel import Channel
 from kraken_web_api.model.connection import SocketConnection
 from kraken_web_api.model.order_book import OrderBook
+from kraken_web_api.model.price import Price
 from kraken_web_api.model.subscription import Subscription, SubscriptionRequest
 
 
@@ -27,7 +28,7 @@ class WebSocket:
         self._configure_loggers(name, socket_log_level)
         self.connections: Set[SocketConnection] = set()
         self.channels: Set[Channel] = set()
-        self.order_book: OrderBook = OrderBook()
+        self.order_books: List[OrderBook] = list()
         self._on_book_changed: Optional[Callable] = None
         self.disconnecting = False
         self.logger.debug("Kraken client has been instantiated")
@@ -37,6 +38,7 @@ class WebSocket:
         return self
 
     async def __aexit__(self, exc_t, exc_v, exc_tb):
+        await self.unsubscribe_all()
         await self._disconnect_all()
 
     async def subscribe_orders_book(self, pair: str, depth: int, on_update: Callable = None) -> None:
@@ -127,10 +129,43 @@ class WebSocket:
         if isinstance(obj, Channel):
             self._handle_channel(obj)
         if isinstance(obj, OrderBook):
-            self.order_book = obj
-            if self._on_book_changed is not None:
-                self._on_book_changed()
-            self.logger.debug("Order book has been updated: %s", obj)
+            self._handle_order_book(obj)
+
+    def _handle_order_book(self, book: OrderBook) -> None:
+        """ Handle recieved book data """
+        if book.channelID is not None:
+            # new book initialized
+            books = [b for b in self.order_books if b.channelID == book.channelID]
+            if len(books) > 0:
+                books[0] = book
+            else:
+                self.order_books.append(book)
+        else:
+            # book data update
+            books = [b for b in self.order_books if b.symbol == book.symbol and b.count == book.count]
+            if len(books) > 0:
+                self._update_book_data(book, books[0])
+        if self._on_book_changed is not None:
+            self._on_book_changed()
+        self.logger.debug("Order book has been updated: %s", book)
+
+    def _update_book_data(self, data: OrderBook, book: OrderBook) -> None:
+        if len(data.asks) > 0:
+            self._update_book_prices(data.asks, book.asks)
+        if len(data.bids) > 0:
+            self._update_book_prices(data.bids, book.bids)
+
+    def _update_book_prices(self, data: List[Price], prices: List[Price]):
+        for new_price in data:
+            price = [p for p in prices if p.price == new_price.price]
+            if len(price) == 0:
+                prices.append(new_price)
+                continue
+            if new_price.volume == 0.0:
+                prices.remove(price[0])
+                continue
+            price[0].volume = new_price.volume
+            price[0].timestamp = new_price.timestamp
 
     def _handle_channel(self, channel: Channel) -> None:
         """ Handle channel object recieved """
