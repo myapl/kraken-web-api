@@ -6,12 +6,14 @@ from typing import Callable, Set, Optional, Union
 from websockets import client
 
 from kraken_web_api.constants import SOCKET_PUBLIC
-from kraken_web_api.enums import ConnectionStatus
+from kraken_web_api.enums import ChannelStatus, ConnectionStatus, SubscriptionType
 from kraken_web_api.exceptions import SocketConnectionError
 from kraken_web_api.handlers import Handler
+from kraken_web_api.helpers.helpers import from_dataclass_to_dict
 from kraken_web_api.model.channel import Channel
 from kraken_web_api.model.connection import SocketConnection
 from kraken_web_api.model.order_book import OrderBook
+from kraken_web_api.model.subscription import Subscription, SubscriptionRequest
 
 
 class WebSocket:
@@ -46,20 +48,23 @@ class WebSocket:
         """
         if self._get_public_connection() is None:
             await self._connect_socket(SOCKET_PUBLIC)
-        subscription_obj = {
-            "event": "subscribe",
-            "subscription": {
-                "depth": depth,
-                "name": "book"
-            },
-            "pair": [pair]
-        }
-        await self._send_public(json.dumps(subscription_obj))
+        subscription_obj = SubscriptionRequest(
+            event="subscribe",
+            subscription=Subscription(
+                name=SubscriptionType.book,
+                depth=depth,
+            ),
+            pair=[pair]
+        )
+        subscription_dict = from_dataclass_to_dict(subscription_obj)
+        await self._send_public(json.dumps(subscription_dict))
         self._on_book_changed = on_update
 
     async def unsubscribe_all(self):
         """ Unsubscribe all channels """
-        pass
+        for channel in self.channels:
+            if channel.status == ChannelStatus.subscribed:
+                pass
 
     async def _connect_socket(self, socket: str) -> None:
         """ Create new websocket connection
