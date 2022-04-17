@@ -21,9 +21,12 @@ from kraken_web_api.model.price import Price
 #             '["0.000695750","476.31709490","1650138426.515436"],["0.000695740","424.00000000","1650138426.453783"]]},'\
 #             '"book-10","NANO/ETH"]'
 
-DATA_LIST = [2128, {"as": [["0.000702680", "5.09240716", "1650138439.570743"], ["0.000702690", "8.30209792", "1650138431.584508"]],
-                    "bs": [["0.000700620", "521.46800762", "1650138439.347806"], ["0.000699890", "26.60000000", "1650138439.544563"]]},
-             "book-10", "NANO/ETH"]
+BOOK_INIT_LIST = [2128, {"as": [["0.000702680", "5.09240716", "1650138439.570743"], ["0.000702690", "8.30209792", "1650138431.584508"]],
+                         "bs": [["0.000700620", "521.46800762", "1650138439.347806"], ["0.000699890", "26.60000000", "1650138439.544563"]]},
+                  "book-10", "NANO/ETH"]
+
+BOOK_BID_UPDATE = [2128, {"b": [["0.000707640", "265.70008036", "1650173638.242924"]], "c": "4140403579"}, "book-10", "NANO/ETH"]
+BOOK_ASK_UPDATE = [2128, {"a": [["0.000709420", "173.18000000", "1650173637.897915"]], "c": "3299039756"}, "book-10", "NANO/ETH"]
 
 DATA_LIST_MESSAGE = '[2128,{"as":[["0.000702680","5.09240716","1650138439.570743"],["0.000702690","8.30209792","1650138431.584508"]],\
                     "bs":[["0.000700620","521.46800762","1650138439.347806"],["0.000699890","26.60000000","1650138439.544563"]]},\
@@ -32,6 +35,32 @@ DATA_LIST_MESSAGE = '[2128,{"as":[["0.000702680","5.09240716","1650138439.570743
 DATA_DICT_MESSAGE = '{"channelID":2128,"channelName":"book-10","event":"subscriptionStatus","pair":"NANO/ETH","status":"subscribed",\
                     "subscription":{"depth":10,"name":"book"}}'
 
+EXPECTED_ORDER_BOOK = OrderBook(
+                                    "book-10",
+                                    "NANO/ETH",
+                                    [
+                                        Price(Decimal('0.000702680'), Decimal('5.09240716'), Decimal('1650138439.570743')),
+                                        Price(Decimal('0.000702690'), Decimal('8.30209792'), Decimal('1650138431.584508'))
+                                    ],
+                                    [
+                                        Price(Decimal('0.000700620'), Decimal('521.46800762'), Decimal('1650138439.347806')),
+                                        Price(Decimal('0.000699890'), Decimal('26.60000000'), Decimal('1650138439.544563'))
+                                    ],
+                                )
+
+# EXPECTED_ORDER_BOOK = OrderBook(
+#                                     "book-10",
+#                                     "NANO/ETH",
+#                                     [
+#                                         Price(0.000702680, 5.09240716, 1650138439.570743),
+#                                         Price(0.000702690, 8.30209792, 1650138431.584508)
+#                                     ],
+#                                     [
+#                                         Price(0.000700620, 521.46800762, 1650138439.347806),
+#                                         Price(0.000699890, 26.60000000, 1650138439.544563)
+#                                     ],
+#                                 )
+
 
 def on_update():
     pass
@@ -39,8 +68,8 @@ def on_update():
 
 class TestHandlers:
 
-    # def setup_method(self):
-    #     self.order_book = OrderBook()
+    def setup_method(self):
+        self.expected_order_book = EXPECTED_ORDER_BOOK
 
     def test_handle_message_raises_invalid_json(self):
         with pytest.raises(InvalidJsonException):
@@ -60,17 +89,11 @@ class TestHandlers:
 
     def test_handle_book_data(self):
         order_book = OrderBook()
-        expected_order_book = OrderBook(
-            "book-10",
-            "NANO/ETH",
-            [
-                Price(Decimal(0.000702680), Decimal(5.09240716), Decimal(1650138439.570743)),
-                Price(Decimal(0.000702690), Decimal(8.30209792), Decimal(1650138431.584508))
-            ],
-            [
-                Price(Decimal(0.000700620), Decimal(521.46800762), Decimal(1650138439.347806)),
-                Price(Decimal(0.000699890), Decimal(26.60000000), Decimal(1650138439.544563))
-            ],
-        )
-        order_book = Handler.handle_book_data(DATA_LIST, order_book)
-        assert order_book.count == expected_order_book.count
+        order_book = Handler.handle_book_data(BOOK_INIT_LIST, order_book)
+        assert order_book == self.expected_order_book
+
+    def test_handle_book_bid_update(self):
+        order_book = Handler.handle_book_data(BOOK_BID_UPDATE, self.expected_order_book)
+        self.expected_order_book.bids.append(
+            Price(Decimal('0.000707640'), Decimal('265.70008036'), Decimal('1650173638.242924')))
+        assert order_book == self.expected_order_book
