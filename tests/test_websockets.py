@@ -26,9 +26,7 @@ class AsyncIterator:
 
 class TestWebsocket:
     def setup_method(self):
-        self.ws_client = WebSocket(
-            name="TestWebSocketClient",
-            socket_log_level=logging.NOTSET)
+        self.ws_client = WebSocket(name="TestWebSocketClient", socket_log_level=logging.NOTSET)
 
     @pytest.mark.asyncio
     @patch("kraken_web_api.websocket.WebSocket._send_public")
@@ -62,9 +60,9 @@ class TestWebsocket:
         expected_book = OrderBook(channelID=1234)
         handler_mock.handle_message.return_value = expected_book
         resp = ['']
-        self.ws_client._on_book_changed = MagicMock()
+        self.ws_client._on_orderbook_changed = MagicMock()
         await self.ws_client._recieve(AsyncIterator(resp))
         books = [b for b in self.ws_client.order_books if b.channelID == expected_book.channelID]
         assert handler_mock.handle_message.called
         assert len(books) > 0
-        assert self.ws_client._on_book_changed.called
+        assert self.ws_client._on_orderbook_changed.called
