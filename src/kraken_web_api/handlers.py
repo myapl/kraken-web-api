@@ -2,13 +2,14 @@
 from decimal import Decimal
 import json
 from typing import Dict, List
-from kraken_web_api.enums import DictResponse
+from kraken_web_api.enums import DictResponse, SubscriptionType
 
 from kraken_web_api.exceptions import BookDataHandlingException, InvalidJsonException
 from kraken_web_api.model.channel import Channel
 from kraken_web_api.model.order_book import OrderBook
 from kraken_web_api.model.price import Price
 from kraken_web_api.model.connection import SocketConnection
+from kraken_web_api.model.ticker import Ticker, TickerData
 
 
 class Handler:
@@ -38,9 +39,28 @@ class Handler:
 
     @staticmethod
     def _handle_list_object(data_list: List) -> object:
-        # subscription_id = data_list[0]
-        book = OrderBook()
-        return Handler.handle_book_data(data_list, book)
+        if SubscriptionType.book.name in data_list[-2]:
+            book = OrderBook()
+            return Handler.handle_book_data(data_list, book)
+        if SubscriptionType.ticker.name == data_list[-2]:
+            return Handler._handle_ticker_data(data_list)
+
+        raise NotImplementedError(f"Subscription type [{data_list[-2]}] is not implemented.")
+
+    @staticmethod
+    def _handle_ticker_data(data_list: List) -> Ticker:
+        data = TickerData(
+            (Decimal(data_list[1]["a"][0]), data_list[1]["a"][1], Decimal(data_list[1]["a"][2])),
+            (Decimal(data_list[1]["b"][0]), data_list[1]["b"][1], Decimal(data_list[1]["b"][2])),
+            (Decimal(data_list[1]["c"][0]), Decimal(data_list[1]["c"][1])),
+            (Decimal(data_list[1]["v"][0]), Decimal(data_list[1]["v"][1])),
+            (Decimal(data_list[1]["p"][0]), Decimal(data_list[1]["p"][1])),
+            (data_list[1]["c"][0], data_list[1]["c"][1]),
+            (Decimal(data_list[1]["l"][0]), Decimal(data_list[1]["l"][1])),
+            (Decimal(data_list[1]["h"][0]), Decimal(data_list[1]["h"][1])),
+            (Decimal(data_list[1]["o"][0]), Decimal(data_list[1]["o"][1]))
+        )
+        return Ticker(data_list[0], data, data_list[-1], data_list[-2])
 
     @staticmethod
     def handle_book_data(data_list: List, book: OrderBook) -> OrderBook:
