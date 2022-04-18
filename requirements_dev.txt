@@ -5,3 +5,4 @@ pytest-cov==3.0.0
 pytest-asyncio==0.18.3
 mypy===0.942
 types-setuptools==57.4.14
+types-requests==2.27.19
