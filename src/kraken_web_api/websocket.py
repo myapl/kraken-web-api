@@ -9,12 +9,12 @@ from kraken_web_api.constants import SOCKET_PUBLIC
 from kraken_web_api.enums import ChannelStatus, ConnectionStatus, SubscriptionType
 from kraken_web_api.exceptions import SocketConnectionError
 from kraken_web_api.handlers import Handler
-from kraken_web_api.helpers.helpers import from_dataclass_to_dict
 from kraken_web_api.model.channel import Channel
 from kraken_web_api.model.connection import SocketConnection
 from kraken_web_api.model.order_book import OrderBook
 from kraken_web_api.model.price import Price
-from kraken_web_api.model.subscription import Subscription, SubscriptionRequest
+from kraken_web_api.model.ticker import Ticker
+from kraken_web_api.subscribe_creator import SubscribtionRequestCreator, RequestCreator
 
 
 class WebSocket:
@@ -29,9 +29,13 @@ class WebSocket:
         self.connections: Set[SocketConnection] = set()
         self.channels: Set[Channel] = set()
         self.order_books: List[OrderBook] = list()
-        self._on_book_changed: Optional[Callable] = None
+        self.tickers: List[Ticker] = list()
         self.disconnecting = False
-        self.logger.debug("Kraken client has been instantiated")
+        self.request_creator: RequestCreator = SubscribtionRequestCreator()  # type: ignore
+        self._on_orderbook_changed: Optional[Callable] = None
+        self._on_ticker_changed: Optional[Callable] = None
+
+        self.logger.debug("Kraken websocket client has been instantiated")
 
     async def __aenter__(self):
         await self._connect_socket(SOCKET_PUBLIC)
@@ -50,17 +54,19 @@ class WebSocket:
         """
         if self._get_public_connection() is None:
             await self._connect_socket(SOCKET_PUBLIC)
-        subscription_obj = SubscriptionRequest(
-            event="subscribe",
-            subscription=Subscription(
-                name=SubscriptionType.book,
-                depth=depth,
-            ),
-            pair=[pair]
-        )
-        subscription_dict = from_dataclass_to_dict(subscription_obj)
-        await self._send_public(json.dumps(subscription_dict))
-        self._on_book_changed = on_update
+        request = self.request_creator.create(type=SubscriptionType.book,
+                                              pair=pair, depth=depth, subscribe=True)
+        await self._send_public(json.dumps(request))
+        self._on_orderbook_changed = on_update
+
+    async def subscribe_ticker_info(self, pair: str, on_update: Callable = None) -> None:
+        """ Ticker information on currency pair. """
+        if self._get_public_connection() is None:
+            await self._connect_socket(SOCKET_PUBLIC)
+        request = self.request_creator.create(type=SubscriptionType.ticker,
+                                              pair=pair, subscribe=True)
+        await self._send_public(json.dumps(request))
+        self._on_ticker_changed = on_update
 
     async def unsubscribe_all(self) -> None:
         """ Unsubscribe all channels """
@@ -70,19 +76,25 @@ class WebSocket:
 
     async def _unsubscribe_public(self, channel: Channel) -> None:
         """ Unsubscribe channel using public connection """
+        request = None
         connection = self._get_public_connection()
         if connection is not None:
             if channel.subscription.name == SubscriptionType.book.name:
-                request = self._unsubscribe_book_request(channel)
+                request = self._create_unsubscribe_book_request(channel)
+            if channel.subscription.name == SubscriptionType.ticker.name:
+                pass
+            if request is not None:
                 await connection.websocket.send(json.dumps(request))
 
-    def _unsubscribe_book_request(self, channel: Channel) -> Dict:
-        unsubscribe_obj = SubscriptionRequest(
-                event="unsubscribe",
-                subscription=channel.subscription,
-                pair=["ETH/BTC"]
-            )
-        return from_dataclass_to_dict(unsubscribe_obj)
+    def _create_unsubscribe_book_request(self, channel: Channel) -> Optional[Dict]:
+        books = [b for b in self.order_books if b.channelID == channel.channelID]
+        if len(books) > 0:
+            return self.request_creator.create(type=SubscriptionType.book,
+                                               pair=books[0].symbol, subscribe=False)
+        return None
+
+    def _create_unsubscribe_ticker_request(self, channel: Channel) -> Optional[Dict]:
+        pass
 
     async def _connect_socket(self, socket: str) -> None:
         """ Create new websocket connection
@@ -130,6 +142,16 @@ class WebSocket:
             self._handle_channel(obj)
         if isinstance(obj, OrderBook):
             self._handle_order_book(obj)
+        if isinstance(obj, Ticker):
+            self._handle_ticker(obj)
+
+    def _handle_ticker(self, ticker: Ticker) -> None:
+        tickers = [t for t in self.tickers if t.channelName == ticker.channelName and t.pair == ticker.pair]
+        if len(tickers) > 0:
+            self.tickers.remove(tickers[0])
+        self.tickers.append(ticker)
+        if self._on_ticker_changed is not None:
+            self._on_ticker_changed()
 
     def _handle_order_book(self, book: OrderBook) -> None:
         """ Handle recieved book data """
@@ -145,8 +167,8 @@ class WebSocket:
             books = [b for b in self.order_books if b.symbol == book.symbol and b.count == book.count]
             if len(books) > 0:
                 self._update_book_data(book, books[0])
-        if self._on_book_changed is not None:
-            self._on_book_changed()
+        if self._on_orderbook_changed is not None:
+            self._on_orderbook_changed()
         self.logger.debug("Order book has been updated: %s", book)
 
     def _update_book_data(self, data: OrderBook, book: OrderBook) -> None:
